@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual Environment
+venv/
+.env
+
+# VSCode
+.vscode/
+
+# Logs
+*.log
+
+# Pytest
+.pytest_cache/
+
+# Mypy
+.mypy_cache/
+
+# Coverage
+.coverage
+htmlcov/
+
+# Alembic
+versions/__pycache__/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploads locais
+storage/uploads/
+
+# Environment
+.env.local
