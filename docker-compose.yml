@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:17
+
+    container_name: arcafs-postgres
+
+    restart: always
+
+    environment:
+      POSTGRES_USER: arcafs
+      POSTGRES_PASSWORD: arcafs123
+      POSTGRES_DB: arcafs_db
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
