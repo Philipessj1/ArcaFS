@@ -21,8 +21,8 @@ Criar uma aplicação semelhante a um mini Google Drive para fins de estudo e po
 
 ## Roadmap
 
-- [ ] Cadastro de usuários
-- [ ] Login JWT
+- [x] Cadastro de usuários
+- [x] Login JWT
 - [ ] Upload de arquivos
 - [ ] Download
 - [ ] Exclusão
