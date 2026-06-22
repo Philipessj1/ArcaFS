@@ -10,8 +10,13 @@ from app.database.dependencies import get_db
 from app.models.user import User
 
 from app.schemas.user import UserCreate
+from app.schemas.auth import LoginRequest, TokenResponse
 
-from app.auth.security import hash_password
+from app.auth.security import (
+    hash_password, 
+    create_access_token, 
+    verify_password
+)
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -65,12 +70,43 @@ def register_user(
         password_hash=hash_password(user_data.password)
     )
 
+    # Save user to database
     db.add(user)
     db.commit()
     db.refresh(user)
 
+    # Return user info (excluding password hash)
     return {
         "id": user.id, 
         "name": user.name, 
         "email": user.email
         }
+
+# User login endpoint
+@app.post("/login", response_model=TokenResponse)
+def login(
+    credentials: LoginRequest,
+    db: Session = Depends(get_db),
+):  
+    # Retrieve user from database based on email
+    user = db.scalar(
+        select(User).where(User.email == credentials.email)
+    )
+
+    # Verify user exists and password is correct
+    if not user or not verify_password(
+        credentials.password,
+        user.password_hash,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+    )
+
+    # Create JWT access token for authenticated user
+    access_token = create_access_token(subject=str(user.id))
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+    }
