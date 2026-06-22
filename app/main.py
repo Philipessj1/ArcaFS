@@ -11,14 +11,19 @@ from app.models.user import User
 
 from app.schemas.user import UserCreate
 
+from app.auth.security import hash_password
+
+# Create database tables
 Base.metadata.create_all(bind=engine)
 
+# Initialize FastAPI app
 app = FastAPI(
     title="ArcaFS API",
     description="Cloud File Storage API built with FastAPI",
     version="0.1.0",
 )
 
+# Basic endpoints for testing
 @app.get("/")
 def root():
     return {"message": "Welcome to ArcaFS"}
@@ -32,22 +37,32 @@ def db_test():
     with engine.connect() as connection:
         result = connection.execute(text("SELECT 1"))
         return {"db_test": result.scalar()}
-    
-@app.post("/register", status_code=status.HTTP_201_CREATED)
-def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
+
+# User registration endpoint   
+@app.post(
+    "/register", 
+    status_code=status.HTTP_201_CREATED
+    )
+def register_user(
+    user_data: UserCreate, 
+    db: Session = Depends(get_db)
+ ):
     existing_user = db.scalar(
         select(User).where(User.email == user_data.email)
     )
 
+    # Check if user with the same email already exists  
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Email already registered"
         )
 
+    # Create new user and save to database
     user = User(
         name=user_data.name,
-        email=user_data.email
+        email=user_data.email,
+        password_hash=hash_password(user_data.password)
     )
 
     db.add(user)
