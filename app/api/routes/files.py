@@ -5,6 +5,7 @@ from fastapi import (
     status,
     File as FastAPIFile,
     HTTPException,
+    Response,
 )
 from fastapi.responses import FileResponse as FastAPIFileResponse
 from sqlalchemy import select
@@ -109,3 +110,51 @@ def download_file(
         media_type=file_record.content_type or "application/octet-stream",
         filename=file_record.original_filename,
 )
+
+# Endpoint to delete a specific file by its ID
+@router.delete(
+    "/{file_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_file(
+    file_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # Query the database for the file with the given ID and owned by the current user
+    file_record = db.scalar(
+        select(File).where(
+            File.id == file_id,
+            File.owner_id == current_user.id,
+        )
+    )
+
+    # Check if the file record exists; if not, raise a 404 error
+    if not file_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found",
+        )
+
+    # Check if the file exists in the storage; if it does, delete it
+    file_path = Path(file_record.stored_path)
+
+    # Attempt to delete the file from storage
+    try:
+        if file_path.exists():
+            file_path.unlink()
+
+        # Delete the file record from the database
+        db.delete(file_record)
+        db.commit()
+
+    # Handle any OSError that may occur during file deletion and rollback the database transaction
+    except OSError:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not delete the file from storage.",
+        )
+    
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
