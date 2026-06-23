@@ -1,10 +1,9 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = (
-    "postgresql://arcafs:arcafs123@localhost:5432/arcafs_db"
-)
+from app.core.config import DATABASE_URL
 
+# Create the database engine
 engine = create_engine(DATABASE_URL)
 
 SessionLocal = sessionmaker(
