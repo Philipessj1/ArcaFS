@@ -5,6 +5,7 @@ from fastapi import (
     status,
     File as FastAPIFile,
 )
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
@@ -51,3 +52,16 @@ def upload_file(
     db.refresh(uploaded_file)
 
     return uploaded_file
+
+@router.get("/", response_model=list[FileResponse])
+def list_user_files(
+    curent_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    files = db.scalars(
+        select(File)
+        .where(File.owner_id == curent_user.id)
+        .order_by(File.created_at.desc())
+    ).all()
+
+    return files
