@@ -3,6 +3,8 @@ from fastapi import FastAPI
 from app.database.base import Base
 from app.database.database import engine
 from app.api.router import api_router
+from app.models.file import File
+from app.models.user import User
 
 # Temporarily create database tables on startup (for development)
 # Alembic will be used for migrations in production

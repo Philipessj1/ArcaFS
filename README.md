@@ -10,6 +10,8 @@ ArcaFS é um gerenciador de arquivos em nuvem desenvolvido em Python com foco em
 - SQLAlchemy
 - Docker
 - Docker Compose
+- React
+- Tailwind CSS
 - AWS S3
 - AWS RDS
 - AWS EC2
@@ -26,6 +28,7 @@ Criar uma aplicação semelhante a um mini Google Drive para fins de estudo e po
 - [ ] Upload de arquivos
 - [ ] Download
 - [ ] Exclusão
+- [ ] Frontend
 - [ ] Compartilhamento
 - [ ] Versionamento
 - [ ] AWS S3
