@@ -19,6 +19,7 @@ from app.models.user import User
 from app.models.file import File
 from app.schemas.file import FileResponse
 from app.storage.local import save_file_locally
+from app.storage.validation import validate_upload_file
 
 # Define the router for file-related endpoints
 router = APIRouter(
@@ -36,7 +37,10 @@ def upload_file(
     file: UploadFile = FastAPIFile(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-):
+):  
+    # Validate file before saving
+    validate_upload_file(file)
+
     # Save the uploaded file locally and get its stored filename, path, and size
     stored_filename, stored_path, size = save_file_locally(
         upload_file=file, 
