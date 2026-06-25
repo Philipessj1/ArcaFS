@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 # Avoid circular imports
 if TYPE_CHECKING:
+    from app.models.file_share import FileShare
     from app.models.user import User   
 
 class File(Base):
@@ -62,4 +63,10 @@ class File(Base):
     # Relationship to the User model
     owner: Mapped["User"] = relationship(
         back_populates="files",
+    )
+
+    # Relationship to the File Share model
+    shares: Mapped[list["FileShare"]] = relationship(
+        back_populates="file",
+        cascade="all, delete-orphan",
     )

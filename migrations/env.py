@@ -24,6 +24,7 @@ if config.config_file_name is not None:
 from app.database.base import Base
 from app.models.file import File
 from app.models.user import User
+from app.models.file_share import FileShare
 
 target_metadata = Base.metadata
 

@@ -2,6 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+# File Schema
 class FileResponse(BaseModel):
     id: int
     original_filename: str
