@@ -29,7 +29,7 @@ Criar uma aplicação semelhante a um mini Google Drive para fins de estudo e po
 - [x] Download
 - [x] Exclusão
 - [ ] Frontend
-- [ ] Compartilhamento
+- [x] Compartilhamento
 - [ ] Versionamento
 - [ ] AWS S3
 - [ ] AWS RDS
