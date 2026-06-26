@@ -34,7 +34,7 @@ def download_shared_file(
     if not share:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Shared file is missing from storage",
+            detail="Shared file not found",
         )
 
     # Resolve the physical path of the file from the database record
@@ -52,4 +52,9 @@ def download_shared_file(
         path=file_path,
         media_type=share.file.content_type or "application/octet-stream",
         filename=share.file.original_filename,
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0", 
+        },
     )
