@@ -30,7 +30,7 @@ Criar uma aplicação semelhante a um mini Google Drive para fins de estudo e po
 - [x] Exclusão
 - [ ] Frontend
 - [x] Compartilhamento
-- [ ] Versionamento
+- [x] Versionamento
 - [ ] AWS S3
 - [ ] AWS RDS
 - [ ] CloudWatch

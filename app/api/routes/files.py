@@ -191,6 +191,88 @@ def upload_new_file_version(
 
     return new_version
 
+# Endpoint to list all versions of a specific file ordered by version number
+@router.get(
+    "/{file_id}/versions",
+    response_model=list[FileVersionResponse],  # Ajustado de [FileVersionResponse] para list[...]
+)
+def list_file_versions(
+    file_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # Query the database for the file with the given ID and owned by the current user
+    file_record = db.scalar(
+        select(File).where(
+            File.id == file_id,
+            File.owner_id == current_user.id,
+        )
+    )
+
+    # Check if the core file record exists; if not, raise a 404 error
+    if not file_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found",
+        )
+    
+    # Query the database for all versions associated with the file, ordered by latest version first
+    versions = db.scalars(
+        select(FileVersion)
+        .where(FileVersion.file_id == file_record.id)
+        .order_by(FileVersion.version_number.desc())
+    ).all()
+
+    return versions
+
+# Endpoint to download a specific version of a file by its version number
+@router.get("/{file_id}/versions/{version_number}/download")
+def download_file_version(
+    file_id: int,
+    version_number: int,
+    curent_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # Query the database for the specific file version, ensuring the parent file belongs to the current user
+    version = db.scalar(
+        select(FileVersion)
+        .join(File)
+        .where(
+            FileVersion.file_id == file_id,
+            FileVersion.version_number == version_number,
+            File.owner_id == curent_user.id,
+        )
+    )
+
+    # Check if the file version record exists; if not, raise a 404 error
+    if not version:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File version not found",
+        )
+    
+    # Resolve the physical path of the specific file version from the database record
+    file_path = Path(version.stored_path)
+
+    # Check if the physical file version actually exists in storage; if not, raise a 404 error
+    if not file_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File version is missing from storage",
+        )
+    
+    # Return the file version as a response with appropriate cache control headers to prevent client-side caching
+    return FastAPIFileResponse(
+        path=file_path,
+        media_type=version.content_type or "application/octet-stream",
+        filename=version.original_filename,
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
+
 # Endpoint to list all files uploaded by the current user
 @router.get("/", response_model=list[FileResponse])
 def list_user_files(
