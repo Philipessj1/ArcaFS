@@ -25,6 +25,7 @@ from app.database.base import Base
 from app.models.file import File
 from app.models.user import User
 from app.models.file_share import FileShare
+from app.models.file_version import FileVersion
 
 target_metadata = Base.metadata
 
