@@ -1,5 +1,6 @@
 import os
 from collections.abc import Generator
+from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -14,6 +15,8 @@ from app.models.file import File
 from app.models.file_share import FileShare
 from app.models.file_version import FileVersion
 from app.models.user import User
+
+import app.storage.local as local_storage
 
 # Load the test database URL from environment variables
 TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
@@ -86,3 +89,64 @@ def client() -> Generator[TestClient, None, None]:
 
     # Clear all dependency overrides after the test scenario completes to ensure isolation
     app.dependency_overrides.clear()
+
+# Automated fixture to isolate and intercept local disk storage during test execution
+@pytest.fixture(autouse=True)
+def isolate_upload_storage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    # Construct a sandbox upload directory path using pytest's temporary path provider
+    test_uploads_dir = tmp_path / "uploads"
+
+    # Dynamically patch the core configuration variable to intercept physical file operations
+    monkeypatch.setattr(
+        local_storage,
+        "UPLOADS_DIR",
+        test_uploads_dir,
+    )
+
+    yield test_uploads_dir
+
+
+# Fixture factory providing dynamic user registration and authentication headers
+@pytest.fixture
+def register_and_login(client: TestClient):
+    # Inner closure function to register and authenticate custom users on demand
+    def _register_and_login(
+        name: str = "Test User",
+        email: str = "test@example.com",
+        password: str = "senhaSegura123",
+    ) -> dict[str, str]:
+        # Perform a POST request to provision a new user profile record
+        register_response = client.post(
+            "/auth/register",
+            json={
+                "name": name,
+                "email": email,
+                "password": password,
+            },
+        )
+
+        assert register_response.status_code == 201
+
+        # Perform a POST request to authenticate using the newly created credentials
+        login_response = client.post(
+            "/auth/login",
+            json={
+                "email": email,
+                "password": password,
+            },
+        )
+
+        assert login_response.status_code == 200
+
+        # Extract the security session identifier from the authentication response payload
+        token = login_response.json()["access_token"]
+
+        # Return a structured dictionary holding valid HTTP Authorization headers
+        return {
+            "Authorization": f"Bearer {token}",
+        }
+
+    return _register_and_login
