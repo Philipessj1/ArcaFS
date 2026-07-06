@@ -19,7 +19,7 @@ from app.models.user import User
 import app.storage.local as local_storage
 
 # Load the test database URL from environment variables
-TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
+from app.core.config import TEST_DATABASE_URL
 
 # Validate that the test database environment variable is explicitly set
 if not TEST_DATABASE_URL:
