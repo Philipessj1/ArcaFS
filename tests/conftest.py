@@ -150,3 +150,14 @@ def register_and_login(client: TestClient):
         }
 
     return _register_and_login
+
+@pytest.fixture
+def db_session() -> Generator[Session, None, None]:
+
+    # Provide a database session for test cases, ensuring proper cleanup after each test
+    db = TestingSessionLocal()
+
+    try:
+        yield db
+    finally:
+        db.close()
