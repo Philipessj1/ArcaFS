@@ -329,3 +329,64 @@ def test_user_cannot_delete_another_users_file(
     assert owner_list_response.status_code == 200
     assert len(owner_list_response.json()) == 1
     assert owner_list_response.json()[0]["id"] == file_id
+
+from starlette.testclient import TestClient
+
+
+# Test case to verify that the file processing pipeline drops non-whitelisted mimetypes
+def test_upload_rejects_disallowed_file_types(
+    client: TestClient,
+    register_and_login,
+):
+    # Setup authentication headers for the session owner
+    headers = register_and_login()
+
+    # Perform a multipart form POST request with a forbidden executable mimetype payload
+    response = client.post(
+        "/files/upload",
+        headers=headers,
+        files={
+            "file": (
+                "malicious.exe",
+                b"fake executable content",
+                "application/octet-stream",
+            )
+        },
+    )
+
+    # Assert that the guard interceptor blocks the stream with a 415 Unsupported Media Type status
+    assert response.status_code == 415
+    assert response.json() == {
+        "detail": "File type is not allowed"
+    }
+
+
+# Test case to guarantee that payloads exceeding the volumetric upper boundary are intercepted and rejected
+def test_upload_rejects_file_larger_than_limit(
+    client: TestClient,
+    register_and_login,
+): 
+    # Setup authentication headers for the session owner
+    headers = register_and_login()
+
+    # Artificially synthesize an oversized byte array stream precisely 1 byte beyond the 10 MB limit
+    oversized_content = b"x" * (10 * 1024 * 1024 + 1)  # 10 MB + 1 byte
+
+    # Perform a multipart form POST request containing the boundary-breaking file stream
+    response = client.post(
+        "/files/upload",
+        headers=headers,
+        files={
+            "file": (
+                "large_file.txt",
+                oversized_content,
+                "text/plain",
+            )
+        },
+    )
+
+    # Assert that the volumetric guard rejects the request with a 413 Content Too Large status
+    assert response.status_code == 413
+    assert response.json() == {
+        "detail": "File exceeds the 10 MB upload limit"
+    }
