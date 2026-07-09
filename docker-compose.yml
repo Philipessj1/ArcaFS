@@ -1,9 +1,24 @@
 services:
+  api:
+    build: .
+    container_name: arcafs-api
+    restart: always
+
+    ports:
+      - "8000:8000"
+
+    env_file:
+      - .env
+    
+    depends_on:
+      - postgres
+    
+    volumes:
+      - ./storage/uploads:/app/storage/uploads
+  
   postgres:
     image: postgres:17
-
     container_name: arcafs-postgres
-
     restart: always
 
     environment:
