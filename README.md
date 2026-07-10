@@ -4,7 +4,7 @@
 
 O **ArcaFS (Ark File System)** é um gerenciador de arquivos em nuvem inspirado em soluções como Google Drive e Dropbox.
 
-O projeto foi criado como portfólio para demonstrar conhecimentos práticos em desenvolvimento backend, bancos de dados relacionais, Docker, Cloud Computing, AWS, segurança, arquitetura de APIs e práticas de DevOps.
+O projeto foi criado como portfólio para demonstrar conhecimentos práticos em desenvolvimento backend, bancos de dados relacionais, Docker, Cloud Computing, AWS, segurança, arquitetura de APIs, testes automatizados e práticas de DevOps.
 
 ## Objetivo
 
@@ -16,6 +16,8 @@ Construir uma aplicação completa de gerenciamento de arquivos que permita:
 * controle de acesso por usuário;
 * compartilhamento temporário por links públicos;
 * versionamento e restauração de arquivos;
+* execução completa com Docker e Docker Compose;
+* testes automatizados com banco de dados isolado;
 * migração futura para AWS S3, RDS, CloudWatch e CI/CD.
 
 ## Tecnologias
@@ -36,11 +38,22 @@ Construir uma aplicação completa de gerenciamento de arquivos que permita:
 * Alembic
 * psycopg2-binary
 
+### Testes
+
+* Pytest
+* Starlette TestClient
+* Banco PostgreSQL separado para testes
+* Fixtures para isolamento de banco, autenticação e storage temporário
+
 ### Infraestrutura
 
 * Docker
 * Docker Compose
 * Variáveis de ambiente com `.env`
+* Container da API FastAPI
+* Container do PostgreSQL
+* Volume persistente para o banco
+* Volume local para arquivos enviados
 
 ### Tecnologias planejadas
 
@@ -53,7 +66,6 @@ Construir uma aplicação completa de gerenciamento de arquivos que permita:
 * AWS EC2 ou ECS
 * AWS CloudWatch
 * GitHub Actions
-* Pytest
 * Terraform
 
 ## Arquitetura atual
@@ -62,16 +74,37 @@ Construir uma aplicação completa de gerenciamento de arquivos que permita:
 Cliente / Swagger
        │
        ▼
-FastAPI + Uvicorn
+localhost:8000
+       │
+       ▼
+Container FastAPI + Uvicorn
        │
        ├── JWT Authentication
        ├── SQLAlchemy ORM
        │       │
        │       ▼
-       │   PostgreSQL em Docker
+       │   Container PostgreSQL
        │
        └── Storage local
            storage/uploads/<user_id>/
+```
+
+## Arquitetura de testes
+
+```text
+Pytest
+  │
+  ▼
+TestClient
+  │
+  ▼
+FastAPI App
+  │
+  ├── Banco PostgreSQL de testes
+  │       arcafs_test_db
+  │
+  └── Storage temporário por teste
+          tmp_path/uploads/
 ```
 
 ## Arquitetura planejada na AWS
@@ -141,6 +174,35 @@ FastAPI em Docker
 * [x] Relacionamento entre arquivos e versões
 * [x] Migrations com Alembic
 * [x] Evolução de schema sem apagar dados
+* [x] Banco separado para testes automatizados
+
+### Testes automatizados
+
+* [x] Testes de health check
+* [x] Testes de cadastro de usuário
+* [x] Testes de login
+* [x] Testes de rota protegida `/users/me`
+* [x] Testes de upload de arquivos
+* [x] Testes de listagem por usuário
+* [x] Testes de download seguro
+* [x] Testes de exclusão segura
+* [x] Testes de isolamento entre usuários
+* [x] Testes de validação de upload
+* [x] Testes de compartilhamento público
+* [x] Testes de revogação de links
+* [x] Testes de links expirados
+* [x] Testes de versionamento de arquivos
+* [x] Testes de restauração de versões antigas
+* [x] Storage temporário isolado durante os testes
+
+### Docker
+
+* [x] PostgreSQL em container
+* [x] FastAPI em container
+* [x] Docker Compose com API + banco
+* [x] Volume persistente para PostgreSQL
+* [x] Volume para uploads locais
+* [x] `.dockerignore` para imagem mais limpa
 
 ## Endpoints principais
 
@@ -200,6 +262,11 @@ ArcaFS/
 │   │   │   ├── users.py
 │   │   │   ├── shares.py
 │   │   │   └── files/
+│   │   │       ├── upload.py
+│   │   │       ├── download.py
+│   │   │       ├── management.py
+│   │   │       ├── shares.py
+│   │   │       └── versions.py
 │   │   └── router.py
 │   │
 │   ├── auth/
@@ -213,6 +280,14 @@ ArcaFS/
 │
 ├── migrations/
 ├── tests/
+│   ├── conftest.py
+│   ├── test_health.py
+│   ├── test_auth.py
+│   ├── test_users.py
+│   ├── test_files.py
+│   ├── test_shares.py
+│   └── test_versions.py
+│
 ├── docs/
 ├── scripts/
 ├── docker/
@@ -222,11 +297,12 @@ ArcaFS/
 ├── docker-compose.yml
 ├── alembic.ini
 ├── requirements.txt
+├── .dockerignore
 ├── .env.example
 └── README.md
 ```
 
-## Como executar localmente
+## Como executar com Docker
 
 ### 1. Clone o repositório
 
@@ -235,40 +311,106 @@ git clone <repository-url>
 cd ArcaFS
 ```
 
-### 2. Crie e ative o ambiente virtual
+### 2. Configure as variáveis de ambiente
+
+```bash
+cp .env.example .env
+```
+
+Preencha o `.env` com os valores necessários.
+
+Exemplo para rodar a API dentro do Docker Compose:
+
+```env
+DATABASE_URL=postgresql://arcafs:arcafs123@postgres:5432/arcafs_db
+TEST_DATABASE_URL=postgresql://arcafs:arcafs123@localhost:5432/arcafs_test_db
+SECRET_KEY=replace-with-a-secure-secret-key
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+```
+
+### 3. Suba a aplicação
+
+```bash
+docker compose up --build
+```
+
+A API estará disponível em:
+
+```text
+http://127.0.0.1:8000
+```
+
+A documentação interativa estará disponível em:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+### 4. Execute as migrations dentro do container
+
+Em outro terminal:
+
+```bash
+docker compose exec api alembic upgrade head
+```
+
+### 5. Rodar em segundo plano
+
+```bash
+docker compose up -d --build
+```
+
+### 6. Ver logs
+
+```bash
+docker compose logs -f api
+```
+
+### 7. Parar containers
+
+```bash
+docker compose down
+```
+
+## Como executar localmente sem container da API
+
+Também é possível rodar a API diretamente no ambiente local usando o venv.
+
+### 1. Crie e ative o ambiente virtual
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 ```
 
-### 3. Instale as dependências
+### 2. Instale as dependências
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configure as variáveis de ambiente
+### 3. Configure o `.env`
 
-```bash
-cp .env.example .env
+Para rodar a API localmente fora do container, use `localhost` na URL do banco:
+
+```env
+DATABASE_URL=postgresql://arcafs:arcafs123@localhost:5432/arcafs_db
 ```
 
-Preencha o `.env` com os valores locais necessários.
-
-### 5. Suba o PostgreSQL
+### 4. Suba o PostgreSQL
 
 ```bash
-docker compose up -d
+docker compose up -d postgres
 ```
 
-### 6. Execute as migrations
+### 5. Execute as migrations
 
 ```bash
 alembic upgrade head
 ```
 
-### 7. Inicie a API
+### 6. Inicie a API
 
 ```bash
 uvicorn app.main:app --reload
@@ -280,18 +422,62 @@ A documentação interativa estará disponível em:
 http://127.0.0.1:8000/docs
 ```
 
+## Como rodar os testes
+
+Os testes usam um banco PostgreSQL separado para evitar apagar dados do ambiente principal.
+
+### 1. Crie o banco de testes
+
+```bash
+docker exec -it arcafs-postgres psql -U arcafs -d postgres -c "CREATE DATABASE arcafs_test_db OWNER arcafs;"
+```
+
+### 2. Confirme a variável no `.env`
+
+```env
+TEST_DATABASE_URL=postgresql://arcafs:arcafs123@localhost:5432/arcafs_test_db
+```
+
+### 3. Rode os testes
+
+```bash
+pytest -v
+```
+
+Os testes criam e limpam as tabelas automaticamente no banco de testes.
+
 ## Roadmap
+
+### Concluído
+
+* [x] Setup inicial com FastAPI
+* [x] PostgreSQL com Docker
+* [x] SQLAlchemy ORM
+* [x] Autenticação com JWT
+* [x] Hash de senha com Argon2
+* [x] Upload e download local
+* [x] Exclusão de arquivos
+* [x] Compartilhamento temporário com token
+* [x] Versionamento de arquivos
+* [x] Restauração de versões antigas
+* [x] Migrations com Alembic
+* [x] Refatoração das rotas de arquivos
+* [x] Testes automatizados com Pytest
+* [x] Banco PostgreSQL separado para testes
+* [x] Dockerização da API
+* [x] Docker Compose com FastAPI + PostgreSQL
 
 ### Próximas etapas
 
-* [ ] Testes automatizados com Pytest
-* [ ] Banco PostgreSQL separado para testes
+* [ ] Melhorar Docker Compose para desenvolvimento
+* [ ] Healthcheck do PostgreSQL
+* [ ] Estratégia para aguardar o banco antes da API
+* [ ] Separar configurações locais e Docker
 * [ ] Paginação e busca de arquivos
 * [ ] Filtros por tipo, data e tamanho
 * [ ] Lixeira e restauração de arquivos excluídos
 * [ ] Logs estruturados e auditoria
-* [ ] Dockerização completa da API
-* [ ] Containerização de FastAPI + PostgreSQL em um único ambiente
+* [ ] Criar camada de services
 * [ ] Abstração de storage local e AWS S3
 * [ ] Upload e download via AWS S3
 * [ ] Frontend com React + TypeScript + Tailwind
@@ -310,6 +496,9 @@ http://127.0.0.1:8000/docs
 * Argon2 protege senhas com hash moderno e resistente a ataques.
 * Arquivos usam UUIDs internos para evitar colisão de nomes.
 * Links compartilhados usam tokens aleatórios, expiração e headers de controle de cache.
+* O versionamento mantém histórico imutável: restaurar uma versão antiga cria uma nova versão atual.
+* Os testes usam banco e storage isolados para evitar interferência no ambiente real.
+* A API foi dockerizada para aproximar o ambiente local de um ambiente real de deploy.
 * O frontend será desenvolvido após a consolidação das APIs principais.
 
 ## Autor
