@@ -10,8 +10,12 @@ services:
     env_file:
       - .env
     
+    environment:
+      DATABASE_URL: postgresql://arcafs:arcafs123@postgres:5432/arcafs_db
+
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     
     volumes:
       - ./storage/uploads:/app/storage/uploads
@@ -31,6 +35,12 @@ services:
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arcafs -d arcafs_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:
