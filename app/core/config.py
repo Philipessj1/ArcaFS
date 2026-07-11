@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
+    STORAGE_BACKEND: str = "local"  # Options: "local", "s3".
+
     MAX_UPLOAD_SIZE_BYTES: int = 10 * 1024 * 1024  # 10 MB
     ALLOWED_CONTENT_TYPES: set[str] = {
         "image/jpeg", # .jpeg
@@ -31,5 +33,6 @@ TEST_DATABASE_URL = settings.TEST_DATABASE_URL
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+STORAGE_BACKEND = settings.STORAGE_BACKEND
 MAX_UPLOAD_SIZE_BYTES = settings.MAX_UPLOAD_SIZE_BYTES
 ALLOWED_CONTENT_TYPES = settings.ALLOWED_CONTENT_TYPES
