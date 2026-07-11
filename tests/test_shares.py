@@ -192,7 +192,7 @@ def test_user_cannot_manage_another_users_shares(
     # Assert that the file resource is obscured, returning a 404 Not Found error
     assert list_response.status_code == 404
     assert list_response.json() == {
-        "detail": "File not Found"
+        "detail": "File not found"
     }
 
     # Attempt a DELETE request as the unauthorized user to revoke the owner's share link
@@ -204,7 +204,7 @@ def test_user_cannot_manage_another_users_shares(
     # Assert that the share tracking record is obscured, returning a 404 Not Found error
     assert revoke_response.status_code == 404
     assert revoke_response.json() == {
-        "detail": "Share link not found"
+        "detail": "File not found"
     }
 
     # Perform an anonymous unauthenticated GET request to verify the public link remains completely functional
