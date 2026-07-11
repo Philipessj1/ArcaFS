@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.models.file_share import FileShare
 from app.models.user import User
 from app.services.file_service import get_user_file_or_404
+from app.storage.provider import get_storage_backend
 
 # Service function to create a shareable link for a specific file, ensuring it belongs to the current user and setting an expiration time for the share link
 def create_file_share(
@@ -118,7 +119,9 @@ def download_shared_file(
     file_record = share.file
     file_path = Path(file_record.stored_path)
 
-    if not file_path.exists():
+    storage = get_storage_backend()
+
+    if not storage.exists(file_record.stored_path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Shared file not found",
@@ -126,7 +129,7 @@ def download_shared_file(
 
     # Return a FastAPI FileResponse object to facilitate file download, using the stored path and original filename, along with headers to prevent caching of the shared file
     return FastAPIFileResponse(
-        path=file_path,
+        path=Path(file_record.stored_path),
         filename=file_record.original_filename,
         media_type=file_record.content_type,
         headers={

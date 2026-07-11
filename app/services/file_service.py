@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.models.file import File
 from app.models.file_version import FileVersion
 from app.models.user import User
-from app.storage.local import save_file_locally
+from app.storage.provider import get_storage_backend
 from app.storage.validation import validate_upload_file
 
 
@@ -21,8 +21,10 @@ def upload_file(
     # Execute interceptor guards to validate mimetype depth and multi-part volumetric limits
     validate_upload_file(upload_file)
 
+    storage = get_storage_backend()
+
     # Persist the file stream to the local isolated storage disk using tenant scoping
-    stored_filename, stored_path, size = save_file_locally(
+    stored_filename, stored_path, size = storage.save_file(
         upload_file=upload_file,
         user_id=current_user.id
     )
@@ -66,12 +68,8 @@ def upload_file(
         # Roll back the active unit of work transaction to prevent orphaned or partial entity records
         db.rollback()
 
-        # Instantiate a Path object pointing to the orphaned disk binary asset
-        saved_path = Path(stored_path)
-
-        # Unlink and purge the dangling binary from disk storage if it was partially written
-        if saved_path.exists():
-            saved_path.unlink()
+        # Remove the persisted file from local storage to maintain consistency with the database state
+        storage.delete_file(stored_path)
         
         # Rethrow the original exception to upstream interceptors
         raise
@@ -127,10 +125,9 @@ def download_user_file(
         current_user,
     )
 
-    # Resolve the physical path of the stored file on disk using the stored_path attribute from the file record
-    file_path = Path(file_record.stored_path)
+    storage = get_storage_backend()
 
-    if not file_path.exists():
+    if not storage.exists(file_record.stored_path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="File not found on storage"
@@ -138,7 +135,7 @@ def download_user_file(
 
     # Return a FastAPI FileResponse object to facilitate file download, using the stored path and original filename
     return FastAPIFileResponse(
-        path=file_path,
+        path=Path(file_record.stored_path),
         filename=file_record.original_filename,
         media_type=file_record.content_type
     )
@@ -157,15 +154,16 @@ def delete_user_file(
         current_user=current_user,
     )
     
-    file_path = Path(file_record.stored_path)
+    storage = get_storage_backend()
+    stored_path = file_record.stored_path
 
     # Enclose the deletion of the database record and the physical file in a try-except block to handle potential errors and ensure transactional integrity
     try:
         db.delete(file_record)
         db.commit()
 
-        if file_path.exists():
-            file_path.unlink()
+        storage.delete_file(file_record.stored_path)
+        
     
     except Exception:
         db.rollback()

@@ -1,73 +1,95 @@
 from pathlib import Path
-from uuid import uuid4
-from shutil import copy2
+import shutil
+import uuid
 
 from fastapi import UploadFile
 
-# Directory to store uploaded files
+from app.storage.base import StorageBackend
+
+
 UPLOADS_DIR = Path("storage/uploads")
 
-# Function to save uploaded files locally
+
+class LocalStorage(StorageBackend):
+    # Implement the abstract methods defined in StorageBackend for local file storage
+    def save_file(
+        self,
+        upload_file: UploadFile,
+        user_id: int,
+    ) -> tuple[str, str, int]:
+        user_upload_dir = UPLOADS_DIR / str(user_id)
+        user_upload_dir.mkdir(parents=True, exist_ok=True)
+
+        extension = Path(upload_file.filename or "").suffix
+        stored_filename = f"{uuid.uuid4()}{extension}"
+        stored_path = user_upload_dir / stored_filename
+
+        content = upload_file.file.read()
+
+        with stored_path.open("wb") as file_buffer:
+            file_buffer.write(content)
+
+        size = stored_path.stat().st_size
+
+        upload_file.file.seek(0)
+
+        return stored_filename, str(stored_path), size
+
+    # Implement the copy_file method to copy a file from a source path to the local storage backend
+    def copy_file(
+        self,
+        source_path: Path,
+        user_id: int,
+        original_filename: str,
+    ) -> tuple[str, str, int]:
+        user_upload_dir = UPLOADS_DIR / str(user_id)
+        user_upload_dir.mkdir(parents=True, exist_ok=True)
+
+        extension = Path(original_filename).suffix
+        stored_filename = f"{uuid.uuid4()}{extension}"
+        destination_path = user_upload_dir / stored_filename
+
+        shutil.copy2(source_path, destination_path)
+
+        size = destination_path.stat().st_size
+
+        return stored_filename, str(destination_path), size
+
+    # Implement the delete_file method to delete a file from the local storage backend given its stored path
+    def delete_file(
+        self,
+        stored_path: str,
+    ) -> None:
+        file_path = Path(stored_path)
+
+        if file_path.exists():
+            file_path.unlink()
+            
+    # Implement the exists method to check if a file exists in the local storage backend given its stored path
+    def exists(
+        self,
+        stored_path: str,
+    ) -> bool:
+        return Path(stored_path).exists()
+
+# Old functions that use LocalStorage directly, can be refactored to use dependency injection for better testability and flexibility in the future.
 def save_file_locally(
     upload_file: UploadFile,
     user_id: int,
 ) -> tuple[str, str, int]:
-
-    # Create user-specific directory if it doesn't exist
-    user_uploads_dir = UPLOADS_DIR / str(user_id)
-    user_uploads_dir.mkdir(parents=True, exist_ok=True)
-
-    # Determine the stored filename and path
-    original_filename = upload_file.filename or "unnamed_file"
-
-    extension = Path(original_filename).suffix
-    stored_filename = f"{uuid4()}{extension}"
-
-    file_path = user_uploads_dir / stored_filename
-
-    # Read the content of the uploaded file and write it to the local storage
-    content = upload_file.file.read()
-
-    with file_path.open("wb") as destination:
-        destination.write(content)
-
-    # Return the stored filename, path, and size of the file
-    return (
-        stored_filename,
-        str(file_path),
-        len(content),
+    return LocalStorage().save_file(
+        upload_file=upload_file,
+        user_id=user_id,
     )
 
+
 def copy_file_locally(
-    source_path: str,
+    source_path: Path,
     user_id: int,
     original_filename: str,
 ) -> tuple[str, str, int]:
-    
-    # Resolve the physical path of the source file
-    source_file = Path(source_path)
-
-    # Validate that the source file exists on disk before proceeding
-    if not source_file.is_file():
-        raise FileNotFoundError("Source file does not exist")
-    
-    # Ensure the user-specific upload directory exists, creating it if necessary
-    user_upload_dir = UPLOADS_DIR / str(user_id)
-    user_upload_dir.mkdir(parents=True, exist_ok=True)
-
-    # Extract the file extension and generate a secure, unique filename using UUID4
-    extension = Path(original_filename).suffix
-    stored_filename = f"{uuid4()}{extension}"
-
-    # Construct the absolute destination path for the copied file
-    destination_path = user_upload_dir / stored_filename
-
-    # Duplicate the file to the target location, preserving its original metadata
-    copy2(source_file, destination_path)
-
-    # Return a structured tuple containing the new filename, destination path, and file size
-    return (
-        stored_filename,
-        str(destination_path),
-        destination_path.stat().st_size,
+    return LocalStorage().copy_file(
+        source_path=source_path,
+        user_id=user_id,
+        original_filename=original_filename,
     )
