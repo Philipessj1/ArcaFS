@@ -10,6 +10,11 @@ class Settings(BaseSettings):
 
     STORAGE_BACKEND: str = "local"  # Options: "local", "s3".
 
+    AWS_ACCESS_KEY_ID: str | None = None
+    AWS_SECRET_ACCESS_KEY: str | None = None
+    AWS_REGION: str = "us-east-1"
+    AWS_S3_BUCKET_NAME: str | None = None
+
     MAX_UPLOAD_SIZE_BYTES: int = 10 * 1024 * 1024  # 10 MB
     ALLOWED_CONTENT_TYPES: set[str] = {
         "image/jpeg", # .jpeg
@@ -36,3 +41,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 STORAGE_BACKEND = settings.STORAGE_BACKEND
 MAX_UPLOAD_SIZE_BYTES = settings.MAX_UPLOAD_SIZE_BYTES
 ALLOWED_CONTENT_TYPES = settings.ALLOWED_CONTENT_TYPES
+AWS_ACCESS_KEY_ID = settings.AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY = settings.AWS_SECRET_ACCESS_KEY
+AWS_REGION = settings.AWS_REGION
+AWS_S3_BUCKET_NAME = settings.AWS_S3_BUCKET_NAME
