@@ -69,8 +69,7 @@ class S3Storage(StorageBackend):
                 detail=f"Failed to upload file to S3",
             ) from exc
         
-        finally:
-            upload_file.file.seek(0)  # Reset the file pointer to the beginning after upload
+        return stored_filename, object_key, size
     
     # Copy a file from one location in S3 to another, returning the new stored filename, path, and size.
     def copy_file(
