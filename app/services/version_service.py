@@ -153,9 +153,10 @@ def download_file_version(
             detail="File version not found",
         )
     
-    # Return a FastAPI FileResponse to allow the user to download the specific file version, including appropriate headers for caching and content type
+    download_path = storage.download_to_temp_file(version.stored_path)
+
     return FastAPIFileResponse(
-        path=file_path,
+        path=download_path,
         filename=version.original_filename,
         media_type=version.content_type,
         headers={

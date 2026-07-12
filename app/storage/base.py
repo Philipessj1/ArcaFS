@@ -40,3 +40,10 @@ class StorageBackend(ABC):
     ) -> bool:
         # Check if a file exists in the storage backend given its stored path
         pass
+    
+    def download_to_temp_file(
+        self,
+        stored_path: str,
+    ) -> Path:
+        # Download a file from the storage backend to a temporary local file and return the path to the temporary file
+        return Path(stored_path)

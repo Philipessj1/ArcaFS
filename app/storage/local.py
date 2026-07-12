@@ -71,6 +71,13 @@ class LocalStorage(StorageBackend):
         stored_path: str,
     ) -> bool:
         return Path(stored_path).exists()
+    
+    # Implement the download_to_temp_file method to return the path to a temporary local file for downloading
+    def download_to_temp_file(
+        self,
+        stored_path: str,
+    ) -> Path:
+        return Path(stored_path)
 
 # Old functions that use LocalStorage directly, can be refactored to use dependency injection for better testability and flexibility in the future.
 def save_file_locally(

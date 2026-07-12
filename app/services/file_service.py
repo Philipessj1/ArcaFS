@@ -133,9 +133,11 @@ def download_user_file(
             detail="File not found on storage"
         )
 
-    # Return a FastAPI FileResponse object to facilitate file download, using the stored path and original filename
+    # Download the file from the storage backend to a temporary local file
+    download_path = storage.download_to_temp_file(file_record.stored_path)
+    
     return FastAPIFileResponse(
-        path=Path(file_record.stored_path),
+        path=download_path,
         filename=file_record.original_filename,
         media_type=file_record.content_type
     )
