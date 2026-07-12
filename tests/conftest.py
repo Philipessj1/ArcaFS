@@ -17,6 +17,7 @@ from app.models.file_version import FileVersion
 from app.models.user import User
 
 import app.storage.local as local_storage
+import app.storage.provider as storage_provider
 
 # Load the test database URL from environment variables
 from app.core.config import TEST_DATABASE_URL
@@ -98,6 +99,12 @@ def isolate_upload_storage(
 ):
     # Construct a sandbox upload directory path using pytest's temporary path provider
     test_uploads_dir = tmp_path / "uploads"
+
+    monkeypatch.setattr(
+        storage_provider,
+        "STORAGE_BACKEND",
+        "local",
+    )
 
     # Dynamically patch the core configuration variable to intercept physical file operations
     monkeypatch.setattr(
