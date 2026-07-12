@@ -54,7 +54,7 @@ class S3Storage(StorageBackend):
 
         # Upload the file to S3 using the S3 client.
         try:
-            self.client.upload_fileobj(
+            self.s3_client.upload_fileobj(
                 Fileobj=upload_file.file,
                 Bucket=self.bucket_name,
                 Key=object_key,
@@ -88,12 +88,12 @@ class S3Storage(StorageBackend):
 
         # Retrieve the metadata of the source object to get its content type and size, then copy the object to the new destination in S3.
         try:
-            metadata = self.client.head_object(
+            metadata = self.s3_client.head_object(
                 Bucket=self.bucket_name,
                 Key=source_key,
             )
 
-            self.client.copy_object(
+            self.s3_client.copy_object(
                 Bucket=self.bucket_name,
                 CopySource={
                     "Bucket": self.bucket_name,
@@ -121,7 +121,7 @@ class S3Storage(StorageBackend):
     ) -> None:
 
         try:
-            self.client.delete_object(
+            self.s3_client.delete_object(
                 Bucket=self.bucket_name,
                 Key=stored_path,
             )
@@ -138,7 +138,7 @@ class S3Storage(StorageBackend):
         stored_path: str,
     ) -> bool:
         try:
-            self.client.head_object(
+            self.s3_client.head_object(
                 Bucket=self.bucket_name,
                 Key=stored_path,
             )
@@ -165,7 +165,7 @@ class S3Storage(StorageBackend):
 
         # Attempt to download the file from S3 to the temporary file. If the download fails, clean up the temporary file and raise an HTTPException.
         try: 
-            self.client.download_file(
+            self.s3_client.download_file(
                 Bucket=self.bucket_name,
                 Key=stored_path,
                 Filename=str(temp_path),
