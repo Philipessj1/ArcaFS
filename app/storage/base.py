@@ -47,3 +47,7 @@ class StorageBackend(ABC):
     ) -> Path:
         # Download a file from the storage backend to a temporary local file and return the path to the temporary file
         return Path(stored_path)
+
+    def should_cleanup_download_file(self) -> bool:
+        # Tells if download_to_temp_file have to be removed after the response
+        return False

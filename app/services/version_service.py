@@ -4,6 +4,7 @@ from fastapi import HTTPException, UploadFile, status
 from fastapi.responses import FileResponse as FastAPIFileResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+from starlette.background import BackgroundTask
 
 from app.models.file import File
 from app.models.file_version import FileVersion
@@ -11,6 +12,8 @@ from app.models.user import User
 from app.services.file_service import get_user_file_or_404
 from app.storage.provider import get_storage_backend
 from app.storage.validation import validate_upload_file
+from app.storage.temp import cleanup_temp_file
+
 
 # Service function to create a new version of an existing file, ensuring it belongs to the current user and validating the uploaded file
 def list_file_versions(
@@ -155,6 +158,14 @@ def download_file_version(
     
     download_path = storage.download_to_temp_file(version.stored_path)
 
+    background = None
+
+    if storage.should_cleanup_download_file():
+        background = BackgroundTask(
+            cleanup_temp_file,
+            download_path,
+        )
+
     return FastAPIFileResponse(
         path=download_path,
         filename=version.original_filename,
@@ -164,6 +175,7 @@ def download_file_version(
             "Pragma": "no-cache",
             "Expires": "0",
         },
+        background=background,
     )
 
 # Service function to restore a specific file version as the current version of the file, ensuring it belongs to the current user

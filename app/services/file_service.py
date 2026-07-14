@@ -4,13 +4,14 @@ from fastapi import HTTPException, UploadFile, status
 from fastapi.responses import FileResponse as FastAPIFileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from starlette.background import BackgroundTask
 
 from app.models.file import File
 from app.models.file_version import FileVersion
 from app.models.user import User
 from app.storage.provider import get_storage_backend
 from app.storage.validation import validate_upload_file
-
+from app.storage.temp import cleanup_temp_file
 
 # Core orchestration service to validate, persist physically, and register a user asset with version control
 def upload_file(
@@ -135,11 +136,20 @@ def download_user_file(
 
     # Download the file from the storage backend to a temporary local file
     download_path = storage.download_to_temp_file(file_record.stored_path)
+
+    background = None
+
+    if storage.should_cleanup_download_file():
+        background = BackgroundTask(
+            cleanup_temp_file,
+            download_path,
+        )
     
     return FastAPIFileResponse(
         path=download_path,
         filename=file_record.original_filename,
-        media_type=file_record.content_type
+        media_type=file_record.content_type,
+        background=background,
     )
 
 # Service function to delete a specific file record by its ID, ensuring it belongs to the current user and removing the associated physical file from disk

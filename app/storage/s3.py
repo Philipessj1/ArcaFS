@@ -179,3 +179,6 @@ class S3Storage(StorageBackend):
             ) from exc
 
         return temp_path
+    
+    def should_cleanup_download_file(self) -> bool:
+        return True

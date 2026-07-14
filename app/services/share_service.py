@@ -6,11 +6,14 @@ from fastapi import HTTPException, status
 from fastapi.responses import FileResponse as FastAPIFileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from starlette.background import BackgroundTask
 
 from app.models.file_share import FileShare
 from app.models.user import User
 from app.services.file_service import get_user_file_or_404
 from app.storage.provider import get_storage_backend
+from app.storage.temp import cleanup_temp_file
+
 
 # Service function to create a shareable link for a specific file, ensuring it belongs to the current user and setting an expiration time for the share link
 def create_file_share(
@@ -128,6 +131,14 @@ def download_shared_file(
         )
 
     download_path = storage.download_to_temp_file(file_record.stored_path)
+
+    background = None
+
+    if storage.should_cleanup_download_file():
+        background = BackgroundTask(
+            cleanup_temp_file,
+            download_path,
+        )
     
     return FastAPIFileResponse(
         path=download_path,
@@ -138,4 +149,5 @@ def download_shared_file(
             "Pragma": "no-cache",
             "Expires": "0",
         },
+        background=background,
     )
