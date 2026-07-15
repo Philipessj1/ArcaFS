@@ -1,6 +1,6 @@
 # ArcaFS
 
-> A secure cloud file manager API built with Python, FastAPI, PostgreSQL, Docker and AWS-focused architecture.
+> A secure cloud file manager API built with Python, FastAPI, PostgreSQL, Docker, AWS S3 and DevOps-focused architecture.
 
 O **ArcaFS (Ark File System)** é um gerenciador de arquivos em nuvem inspirado em soluções como Google Drive e Dropbox.
 
@@ -18,7 +18,9 @@ Construir uma aplicação completa de gerenciamento de arquivos que permita:
 * versionamento e restauração de arquivos;
 * execução completa com Docker e Docker Compose;
 * testes automatizados com banco de dados isolado;
-* migração futura para AWS S3, RDS, CloudWatch e CI/CD.
+* storage local em desenvolvimento;
+* storage em AWS S3 via backend configurável;
+* migração futura para AWS RDS, CloudWatch, CI/CD e infraestrutura como código.
 
 ## Tecnologias
 
@@ -44,6 +46,7 @@ Construir uma aplicação completa de gerenciamento de arquivos que permita:
 * Starlette TestClient
 * Banco PostgreSQL separado para testes
 * Fixtures para isolamento de banco, autenticação e storage temporário
+* Testes protegidos para sempre usarem storage local, mesmo quando o ambiente estiver configurado para S3
 
 ### Infraestrutura
 
@@ -52,8 +55,21 @@ Construir uma aplicação completa de gerenciamento de arquivos que permita:
 * Variáveis de ambiente com `.env`
 * Container da API FastAPI
 * Container do PostgreSQL
+* Healthcheck do PostgreSQL
 * Volume persistente para o banco
-* Volume local para arquivos enviados
+* Volume local para arquivos enviados em ambiente local
+
+### Cloud / AWS
+
+* AWS S3
+* boto3
+* IAM User com política de menor privilégio
+* Bucket privado
+* Upload de arquivos para S3
+* Download de arquivos a partir do S3
+* Exclusão de objetos no S3
+* Cópia de objetos no S3 para restauração de versões
+* Limpeza automática de arquivos temporários usados em downloads via S3
 
 ### Tecnologias planejadas
 
@@ -61,7 +77,6 @@ Construir uma aplicação completa de gerenciamento de arquivos que permita:
 * TypeScript
 * Vite
 * Tailwind CSS
-* AWS S3
 * AWS RDS
 * AWS EC2 ou ECS
 * AWS CloudWatch
@@ -85,8 +100,13 @@ Container FastAPI + Uvicorn
        │       ▼
        │   Container PostgreSQL
        │
-       └── Storage local
-           storage/uploads/<user_id>/
+       └── Storage Backend
+               │
+               ├── LocalStorage
+               │   storage/uploads/<user_id>/
+               │
+               └── S3Storage
+                   AWS S3 Bucket privado
 ```
 
 ## Arquitetura de testes
@@ -103,7 +123,7 @@ FastAPI App
   ├── Banco PostgreSQL de testes
   │       arcafs_test_db
   │
-  └── Storage temporário por teste
+  └── Storage local temporário por teste
           tmp_path/uploads/
 ```
 
@@ -164,6 +184,7 @@ FastAPI em Docker
 * [x] Restauração de versões anteriores
 * [x] Atualização do arquivo principal para apontar para a versão atual
 * [x] Rollback e limpeza de arquivos físicos em caso de erro
+* [x] Restauração usando cópia de arquivo no storage ativo
 
 ### Banco de dados
 
@@ -194,6 +215,7 @@ FastAPI em Docker
 * [x] Testes de versionamento de arquivos
 * [x] Testes de restauração de versões antigas
 * [x] Storage temporário isolado durante os testes
+* [x] Proteção para testes não enviarem arquivos reais para AWS S3
 
 ### Docker
 
@@ -202,7 +224,33 @@ FastAPI em Docker
 * [x] Docker Compose com API + banco
 * [x] Volume persistente para PostgreSQL
 * [x] Volume para uploads locais
+* [x] Healthcheck do PostgreSQL
+* [x] API aguardando banco saudável antes de iniciar
 * [x] `.dockerignore` para imagem mais limpa
+
+### Storage
+
+* [x] Storage local em disco
+* [x] Interface base `StorageBackend`
+* [x] Provider de storage por variável de ambiente
+* [x] `LocalStorage`
+* [x] `S3Storage`
+* [x] Upload para AWS S3
+* [x] Download a partir da AWS S3
+* [x] Exclusão de objetos no S3
+* [x] Cópia de objetos no S3 para restauração de versões
+* [x] Script de teste de conexão com S3
+* [x] Limpeza automática de arquivos temporários em downloads via S3
+
+### Refatoração e arquitetura interna
+
+* [x] Rotas organizadas por domínio
+* [x] Rotas de arquivos separadas por responsabilidade
+* [x] Camada de services criada
+* [x] `file_service.py`
+* [x] `share_service.py`
+* [x] `version_service.py`
+* [x] Regras de negócio movidas das rotas para services
 
 ## Endpoints principais
 
@@ -275,7 +323,17 @@ ArcaFS/
 │   ├── models/
 │   ├── schemas/
 │   ├── services/
+│   │   ├── file_service.py
+│   │   ├── share_service.py
+│   │   └── version_service.py
+│   │
 │   ├── storage/
+│   │   ├── base.py
+│   │   ├── local.py
+│   │   ├── provider.py
+│   │   ├── s3.py
+│   │   └── temp.py
+│   │
 │   └── main.py
 │
 ├── migrations/
@@ -290,6 +348,9 @@ ArcaFS/
 │
 ├── docs/
 ├── scripts/
+│   ├── __init__.py
+│   └── test_s3_connection.py
+│
 ├── docker/
 ├── storage/
 │
@@ -301,6 +362,53 @@ ArcaFS/
 ├── .env.example
 └── README.md
 ```
+
+## Variáveis de ambiente
+
+Exemplo de `.env.example`:
+
+```env
+DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/DATABASE_NAME
+TEST_DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/TEST_DATABASE_NAME
+SECRET_KEY=replace-with-a-secure-secret-key
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+STORAGE_BACKEND=local
+
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_REGION=us-east-1
+AWS_S3_BUCKET_NAME=
+```
+
+### Storage local
+
+Para desenvolvimento local padrão:
+
+```env
+STORAGE_BACKEND=local
+```
+
+Nesse modo, os arquivos são salvos em:
+
+```text
+storage/uploads/<user_id>/
+```
+
+### Storage AWS S3
+
+Para testar o storage em S3:
+
+```env
+STORAGE_BACKEND=s3
+AWS_ACCESS_KEY_ID=sua_access_key
+AWS_SECRET_ACCESS_KEY=sua_secret_key
+AWS_REGION=us-east-1
+AWS_S3_BUCKET_NAME=seu-bucket
+```
+
+O bucket deve ser privado. Os downloads continuam passando pela API, não por URL pública do S3.
 
 ## Como executar com Docker
 
@@ -319,15 +427,18 @@ cp .env.example .env
 
 Preencha o `.env` com os valores necessários.
 
-Exemplo para rodar a API dentro do Docker Compose:
+Exemplo para rodar a API dentro do Docker Compose com PostgreSQL em container:
 
 ```env
-DATABASE_URL=postgresql://arcafs:arcafs123@postgres:5432/arcafs_db
+DATABASE_URL=postgresql://arcafs:arcafs123@localhost:5432/arcafs_db
 TEST_DATABASE_URL=postgresql://arcafs:arcafs123@localhost:5432/arcafs_test_db
 SECRET_KEY=replace-with-a-secure-secret-key
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
+STORAGE_BACKEND=local
 ```
+
+O `docker-compose.yml` sobrescreve a `DATABASE_URL` dentro do container da API para usar o host interno `postgres`.
 
 ### 3. Suba a aplicação
 
@@ -446,6 +557,142 @@ pytest -v
 
 Os testes criam e limpam as tabelas automaticamente no banco de testes.
 
+Mesmo que o ambiente esteja configurado com:
+
+```env
+STORAGE_BACKEND=s3
+```
+
+os testes forçam o uso de storage local temporário para evitar envio de arquivos reais para a AWS.
+
+## Como testar conexão com AWS S3
+
+Antes de usar `STORAGE_BACKEND=s3` na aplicação, configure as variáveis AWS no `.env`:
+
+```env
+AWS_ACCESS_KEY_ID=sua_access_key
+AWS_SECRET_ACCESS_KEY=sua_secret_key
+AWS_REGION=us-east-1
+AWS_S3_BUCKET_NAME=seu-bucket
+```
+
+Depois rode:
+
+```bash
+python -m scripts.test_s3_connection
+```
+
+Resultado esperado:
+
+```text
+S3 connection test passed
+```
+
+Esse script faz um upload simples para o bucket, verifica se o objeto existe e remove o objeto de teste.
+
+## Como testar o ArcaFS com S3
+
+### 1. Configure o `.env`
+
+```env
+STORAGE_BACKEND=s3
+AWS_ACCESS_KEY_ID=sua_access_key
+AWS_SECRET_ACCESS_KEY=sua_secret_key
+AWS_REGION=us-east-1
+AWS_S3_BUCKET_NAME=seu-bucket
+```
+
+### 2. Suba a API
+
+Localmente:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Ou via Docker:
+
+```bash
+docker compose down
+docker compose up --build
+```
+
+### 3. Teste no Swagger
+
+Acesse:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+Fluxo sugerido:
+
+```text
+POST /auth/register
+POST /auth/login
+POST /files/upload
+GET  /files/
+GET  /files/{file_id}/download
+POST /files/{file_id}/share
+GET  /shared/{token}
+POST /files/{file_id}/versions
+GET  /files/{file_id}/versions
+POST /files/{file_id}/versions/{version_number}/restore
+DELETE /files/{file_id}
+```
+
+No bucket S3, os objetos ficam organizados em uma estrutura parecida com:
+
+```text
+users/<user_id>/files/<uuid>.<extension>
+```
+
+## Configuração recomendada do bucket S3
+
+Para ambiente de desenvolvimento, recomenda-se:
+
+```text
+Bucket privado
+Block Public Access ativado
+Object Ownership com ACLs desabilitadas
+Criptografia padrão SSE-S3
+Versionamento do bucket desativado inicialmente
+```
+
+O ArcaFS já possui versionamento próprio no banco de dados, então o versionamento nativo do bucket S3 pode ficar desativado no início.
+
+## Permissões IAM mínimas para S3
+
+Exemplo de policy para desenvolvimento:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ArcAFSListBucket",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket"
+      ],
+      "Resource": "arn:aws:s3:::SEU_BUCKET_AQUI"
+    },
+    {
+      "Sid": "ArcAFSObjectAccess",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::SEU_BUCKET_AQUI/*"
+    }
+  ]
+}
+```
+
+Substitua `SEU_BUCKET_AQUI` pelo nome real do bucket.
+
 ## Roadmap
 
 ### Concluído
@@ -462,24 +709,29 @@ Os testes criam e limpam as tabelas automaticamente no banco de testes.
 * [x] Restauração de versões antigas
 * [x] Migrations com Alembic
 * [x] Refatoração das rotas de arquivos
+* [x] Camada de services
 * [x] Testes automatizados com Pytest
 * [x] Banco PostgreSQL separado para testes
 * [x] Dockerização da API
 * [x] Docker Compose com FastAPI + PostgreSQL
+* [x] Healthcheck do PostgreSQL
+* [x] Abstração de storage
+* [x] Storage local
+* [x] Storage AWS S3
+* [x] Script de teste de conexão com S3
+* [x] Upload/download via AWS S3
+* [x] Limpeza de arquivos temporários usados em downloads via S3
 
 ### Próximas etapas
 
-* [ ] Melhorar Docker Compose para desenvolvimento
-* [ ] Healthcheck do PostgreSQL
-* [ ] Estratégia para aguardar o banco antes da API
-* [ ] Separar configurações locais e Docker
+* [ ] Testes unitários com mock para `S3Storage`
+* [ ] Melhor tratamento de erros de S3
+* [ ] Logs estruturados
+* [ ] Auditoria de ações importantes
 * [ ] Paginação e busca de arquivos
 * [ ] Filtros por tipo, data e tamanho
 * [ ] Lixeira e restauração de arquivos excluídos
-* [ ] Logs estruturados e auditoria
-* [ ] Criar camada de services
-* [ ] Abstração de storage local e AWS S3
-* [ ] Upload e download via AWS S3
+* [ ] Padronização global de erros
 * [ ] Frontend com React + TypeScript + Tailwind
 * [ ] Deploy na AWS
 * [ ] Banco de dados no AWS RDS
@@ -497,8 +749,13 @@ Os testes criam e limpam as tabelas automaticamente no banco de testes.
 * Arquivos usam UUIDs internos para evitar colisão de nomes.
 * Links compartilhados usam tokens aleatórios, expiração e headers de controle de cache.
 * O versionamento mantém histórico imutável: restaurar uma versão antiga cria uma nova versão atual.
+* A camada de services separa regras de negócio das rotas.
+* A abstração de storage permite alternar entre storage local e AWS S3 usando variável de ambiente.
 * Os testes usam banco e storage isolados para evitar interferência no ambiente real.
+* Os testes forçam storage local para evitar envio acidental de arquivos para AWS.
 * A API foi dockerizada para aproximar o ambiente local de um ambiente real de deploy.
+* O bucket S3 permanece privado; a API é responsável por autenticar e entregar downloads.
+* Downloads via S3 usam arquivo temporário local e limpeza automática após resposta.
 * O frontend será desenvolvido após a consolidação das APIs principais.
 
 ## Autor
