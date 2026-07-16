@@ -318,10 +318,31 @@ ArcaFS/
 │   │   └── router.py
 │   │
 │   ├── auth/
+│   │   ├── dependencies.py
+│   │
+│   │   ├── security.py
 │   ├── core/
+│   │   ├── config.py
+│   │
 │   ├── database/
+│   │   ├── base.py
+│   │   ├── database.py
+│   │   ├── dependencies.py
+│   │
 │   ├── models/
+│   │   ├── file_share.py
+│   │   ├── file_version.py
+│   │   ├── file.py
+│   │   ├── user.py
+│   │
 │   ├── schemas/
+│   │   ├── auth.py
+│   │   ├── file_version.py
+│   │   ├── file.py
+│   │   ├── share.py
+│   │   ├── token.py
+│   │   ├── user.py
+│   │
 │   ├── services/
 │   │   ├── file_service.py
 │   │   ├── share_service.py
@@ -337,6 +358,13 @@ ArcaFS/
 │   └── main.py
 │
 ├── migrations/
+│   ├── versions/
+│   │   ├── create_users_and_files_tables.py
+│   │   ├── add_file_versions_tables.py
+│   │   ├── add_original_filename_to_file_versions.py
+│   │   ├── add_file_shares_table.py
+│   ├── env.py
+│   │
 ├── tests/
 │   ├── conftest.py
 │   ├── test_health.py
