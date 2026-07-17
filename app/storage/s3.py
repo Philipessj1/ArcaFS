@@ -14,6 +14,28 @@ from app.core.config import (
 )
 from app.storage.base import StorageBackend
 
+# Convert common errors from S3 to more clear messages for API to handle
+def handle_s3_client_error(
+    exc: ClientError,
+    default_detail: str,
+) -> None:
+    error_code = exc.response.get("Error", {}).get("Code")
+
+    error_messages = {
+        "AccessDenied": "Access denied to S3 bucket or object",
+        "NoSuchBucket": "S3 bucket does not exist",
+        "InvalidAccessKeyId": "Invalid AWS access key",
+        "SignatureDoesNotMatch": "Invalid AWS secret key or request signature",
+        "ExpiredToken": "AWS credentials token has expired",
+    }
+
+    detail = error_messages.get(error_code, default_detail)
+
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=detail,
+    ) from exc
+
 # S3Storage class that implements the StorageBackend interface for AWS S3 storage.
 class S3Storage(StorageBackend):
 
@@ -64,10 +86,10 @@ class S3Storage(StorageBackend):
             )
         
         except ClientError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to upload file to S3",
-            ) from exc
+            handle_s3_client_error(
+                exc,
+                default_detail="Failed to upload file to S3",
+            )
         
         return stored_filename, object_key, size
     
@@ -106,10 +128,10 @@ class S3Storage(StorageBackend):
             size = metadata["ContentLength"]
 
         except ClientError as exc:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to copy file in S3",
-                ) from exc
+                handle_s3_client_error(
+                    exc,
+                    default_detail="Failed to copy file in S3",
+                )
 
         return stored_filename, destination_key, size
     
@@ -126,10 +148,10 @@ class S3Storage(StorageBackend):
             )
 
         except ClientError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to delete file from S3",
-            ) from exc
+            handle_s3_client_error(
+                exc,
+                default_detail="Failed to delete file from S3",
+            )
     
     # Check if a file exists in S3 storage based on its stored path, returning True if it exists and False otherwise.
     def exists(
@@ -148,10 +170,10 @@ class S3Storage(StorageBackend):
             if error_code in ("404", "NoSuchKey", "NotFound"):
                 return False
 
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to check file existence in S3",
-            ) from exc
+            handle_s3_client_error(
+                exc,
+                default_detail="Failed to check file existence in S3",
+            )
 
     # Download a file from S3 storage to a temporary local file and return the path to the temporary file.
     def download_to_temp_file(
@@ -173,10 +195,10 @@ class S3Storage(StorageBackend):
             if temp_path.exists():
                 temp_path.unlink()
             
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to download file from S3",
-            ) from exc
+            handle_s3_client_error(
+                exc,
+                default_detail="Failed to download file from S3",
+            )
 
         return temp_path
     
