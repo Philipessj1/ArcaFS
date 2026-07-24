@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from starlette.background import BackgroundTask
 
+from app.core.logging import log_event
 from app.models.file import File
 from app.models.file_version import FileVersion
 from app.models.user import User
@@ -61,6 +62,16 @@ def upload_file(
         db.add(initial_version)
         db.commit()
         db.refresh(file_record)
+
+        log_event(
+            "file_uploaded",
+            user_id=current_user.id,
+            file_id=file_record.id,
+            filename=file_record.original_filename,
+            content_type=file_record.content_type,
+            size=file_record.size,
+            storage_backend=storage.__class__.__name__,
+        )
 
         # Return the synchronized core file record model object
         return file_record
@@ -175,6 +186,14 @@ def delete_user_file(
         db.commit()
 
         storage.delete_file(file_record.stored_path)
+
+        log_event(
+            "file_deleted",
+            user_id=current_user.id,
+            file_id=file_id,
+            stored_path=stored_path,
+            storage_backend=storage.__class__.__name__,
+        )
         
     
     except Exception:

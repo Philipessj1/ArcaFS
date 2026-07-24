@@ -9,6 +9,7 @@ from starlette.background import BackgroundTask
 from app.models.file import File
 from app.models.file_version import FileVersion
 from app.models.user import User
+from app.core.logging import log_event
 from app.services.file_service import get_user_file_or_404
 from app.storage.provider import get_storage_backend
 from app.storage.validation import validate_upload_file
@@ -92,6 +93,17 @@ def create_new_file_version(
         db.add(version)
         db.commit()
         db.refresh(version)
+
+        log_event(
+            "file_version_created",
+            user_id=current_user.id,
+            file_id=file_record.id,
+            version_id=version.id,
+            version_number=version.version_number,
+            filename=version.original_filename,
+            size=version.size,
+            storage_backend=storage.__class__.__name__,
+        )
 
         return version
     # If any exception occurs during the file version creation process, roll back the database transaction and delete the saved file from local storage to maintain data integrity
@@ -246,6 +258,16 @@ def restore_file_version(
         db.add(restored_version)
         db.commit()
         db.refresh(restored_version)
+
+        log_event(
+            "file_version_restored",
+            user_id=current_user.id,
+            file_id=file_record.id,
+            restored_from_version=version_to_restore.version_number,
+            new_version_id=restored_version.id,
+            new_version_number=restored_version.version_number,
+            storage_backend=storage.__class__.__name__,
+        )
 
         return restored_version
         

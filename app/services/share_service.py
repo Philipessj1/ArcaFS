@@ -13,6 +13,7 @@ from app.models.user import User
 from app.services.file_service import get_user_file_or_404
 from app.storage.provider import get_storage_backend
 from app.storage.temp import cleanup_temp_file
+from app.core.logging import log_event
 
 
 # Service function to create a shareable link for a specific file, ensuring it belongs to the current user and setting an expiration time for the share link
@@ -40,6 +41,14 @@ def create_file_share(
     db.add(share)
     db.commit()
     db.refresh(share)
+
+    log_event(
+        "file_shared",
+        user_id=current_user.id,
+        file_id=file_record.id,
+        share_id=share.id,
+        expires_at=share.expires_at,
+    )
 
     return share
 
@@ -94,6 +103,13 @@ def revoke_file_share(
     # Delete the share record from the database and commit the transaction
     db.delete(share)
     db.commit()
+    
+    log_event(
+        "file_share_revoked",
+        user_id=current_user.id,
+        file_id=file_record.id,
+        share_id=share.id,
+    )
 
 # Service function to download a shared file using a share token, ensuring the share link is valid and has not expired
 def download_shared_file(
