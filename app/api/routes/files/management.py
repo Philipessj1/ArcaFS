@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
@@ -14,10 +14,14 @@ router = APIRouter()
 def list_files(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
 ):  
     return list_user_files(
         db=db,
         current_user=current_user,
+        limit=limit,
+        offset=offset
     )
 
 # Endpoint to delete a specific file by its ID

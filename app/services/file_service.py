@@ -104,6 +104,8 @@ def upload_file(
 def list_user_files(
     db: Session,
     current_user: User,
+    limit: int = 20,
+    offset: int = 0,
 ) -> list[File]:
 
     # Execute a query to retrieve all file records associated with the current user's ID, ordered by creation timestamp in descending order
@@ -112,6 +114,8 @@ def list_user_files(
             select(File)
             .where(File.owner_id == current_user.id)
             .order_by(File.created_at.desc())
+            .offset(offset)
+            .limit(limit)
         )
     )
 
