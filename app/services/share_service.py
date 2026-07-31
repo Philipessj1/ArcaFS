@@ -14,6 +14,7 @@ from app.services.file_service import get_user_file_or_404
 from app.storage.provider import get_storage_backend
 from app.storage.temp import cleanup_temp_file
 from app.core.logging import log_event
+from app.services.audit_services import create_audit_log
 
 
 # Service function to create a shareable link for a specific file, ensuring it belongs to the current user and setting an expiration time for the share link
@@ -41,6 +42,18 @@ def create_file_share(
     db.add(share)
     db.commit()
     db.refresh(share)
+
+    create_audit_log(
+        db=db,
+        user_id=current_user.id,
+        event="file_shared",
+        resource_type="share",
+        resource_id=share.id,
+        details={
+            "file_id": file_record.id,
+            "expires_at": str(share.expires_at),
+        },
+    )
 
     log_event(
         "file_shared",
@@ -83,7 +96,7 @@ def revoke_file_share(
 ) -> None:
     file_record = get_user_file_or_404(
         db=db, 
-        file_id=share_id, 
+        file_id=file_id, 
         current_user=current_user,
     )
 
@@ -100,9 +113,22 @@ def revoke_file_share(
             detail="Share not found"
         )
 
+    share_id = share.id
+
     # Delete the share record from the database and commit the transaction
     db.delete(share)
     db.commit()
+
+    create_audit_log(
+        db=db,
+        user_id=current_user.id,
+        event="share_revoked",
+        resource_type="share",
+        resource_id=share_id,
+        details={
+            "file_id": file_record.id,
+        },
+    )
     
     log_event(
         "file_share_revoked",

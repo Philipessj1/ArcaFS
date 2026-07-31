@@ -13,6 +13,7 @@ from app.models.user import User
 from app.storage.provider import get_storage_backend
 from app.storage.validation import validate_upload_file
 from app.storage.temp import cleanup_temp_file
+from app.services.audit_services import create_audit_log
 
 # Core orchestration service to validate, persist physically, and register a user asset with version control
 def upload_file(
@@ -46,6 +47,19 @@ def upload_file(
         # Stage the file record instantiation to populate and generate the primary identity key
         db.add(file_record)
         db.flush()
+
+        create_audit_log(
+            db=db,
+            user_id=current_user.id,
+            event="file_uploaded",
+            resource_type="file",
+            resource_id=file_record.id,
+            details={
+                "filename": file_record.original_filename,
+                "size": file_record.size,
+                "content_type": file_record.content_type,
+            },
+        )
 
         # Initialize the baseline historical version tracker linked to the newly generated file index
         initial_version = FileVersion(
@@ -182,10 +196,24 @@ def delete_user_file(
 
     # Enclose the deletion of the database record and the physical file in a try-except block to handle potential errors and ensure transactional integrity
     try:
+        audit_details = {
+            "filename": file_record.original_filename,
+            "size": file_record.size,
+        }
+
         db.delete(file_record)
         db.commit()
 
         storage.delete_file(file_record.stored_path)
+
+        create_audit_log(
+            db=db,
+            user_id=current_user.id,
+            event="file_deleted",
+            resource_type="file",
+            resource_id=file_id,
+            details=audit_details,
+        )
 
         log_event(
             "file_deleted",

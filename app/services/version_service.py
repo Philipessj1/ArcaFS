@@ -14,6 +14,7 @@ from app.services.file_service import get_user_file_or_404
 from app.storage.provider import get_storage_backend
 from app.storage.validation import validate_upload_file
 from app.storage.temp import cleanup_temp_file
+from app.services.audit_services import create_audit_log
 
 
 # Service function to create a new version of an existing file, ensuring it belongs to the current user and validating the uploaded file
@@ -93,6 +94,18 @@ def create_new_file_version(
         db.add(version)
         db.commit()
         db.refresh(version)
+
+        create_audit_log(
+            db=db,
+            user_id=current_user.id,
+            event="file_version_created",
+            resource_type="version",
+            resource_id=version.id,
+            details={
+                "file_id": file_record.id,
+                "version_number": version.version_number,
+            },
+        )
 
         log_event(
             "file_version_created",
@@ -258,6 +271,19 @@ def restore_file_version(
         db.add(restored_version)
         db.commit()
         db.refresh(restored_version)
+
+        create_audit_log(
+            db=db,
+            user_id=current_user.id,
+            event="file_version_restored",
+            resource_type="version",
+            resource_id=restored_version.id,
+            details={
+                "file_id": file_record.id,
+                "restored_from": version_to_restore.version_number,
+                "new_version": restored_version.version_number,
+            },
+        )
 
         log_event(
             "file_version_restored",
