@@ -16,12 +16,14 @@ def list_files(
     db: Session = Depends(get_db),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    search: str | None = Query(default=None)
 ):  
     return list_user_files(
         db=db,
         current_user=current_user,
         limit=limit,
-        offset=offset
+        offset=offset,
+        search=search,
     )
 
 # Endpoint to delete a specific file by its ID

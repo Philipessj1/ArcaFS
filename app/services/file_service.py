@@ -106,18 +106,28 @@ def list_user_files(
     current_user: User,
     limit: int = 20,
     offset: int = 0,
+    search: str | None = None,
 ) -> list[File]:
 
-    # Execute a query to retrieve all file records associated with the current user's ID, ordered by creation timestamp in descending order
-    return list(
-        db.scalars(
-            select(File)
-            .where(File.owner_id == current_user.id)
-            .order_by(File.created_at.desc())
-            .offset(offset)
-            .limit(limit)
-        )
+    # Execute a query to retrieve all file records associated with the current user
+    query = (
+        select(File)
+        .where(File.owner_id == current_user.id)
     )
+
+    if search:
+        query = query.where(
+            File.original_filename.ilike(f"%{search}%")
+        )
+
+    query = (
+        query
+        .order_by(File.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+
+    return list(db.scalars(query))
 
 # Service function to retrieve a specific file record by its ID, ensuring it belongs to the current user
 def get_user_file_or_404(
